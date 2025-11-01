@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL音频播放器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 24px;
+            font-weight: 600;
+            color: #222;
+            font-size: 1.8rem;
+        }
+
+        .url-display {
+            background: #f9f9f9;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+            word-break: break-all;
+            font-size: 0.9rem;
+            transition: opacity 0.3s ease;
+        }
+
+        .url-display.hidden {
+            display: none;
+        }
+
+        .audio-container {
+            margin: 24px 0;
+        }
+
+        audio {
+            width: 100%;
+            border-radius: 8px;
+        }
+
+        .status {
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            border: 1px solid #ffcdd2;
+        }
+
+        .info {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .info p {
+            margin-bottom: 8px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>URL音频播放器</h1>
+
+        <div class="url-display" id="current-url"></div>
+
+        <div class="audio-container" id="audio-container"></div>
+
+        <div class="status" id="status-message"></div>
+
+        <div class="info">
+            <p>支持格式: MP3, WAV, OGG, FLAC, AAC</p>
+            <p>示例URL: https://example.com/page?audio=https://example.com/file/music.mp3</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const currentUrlElement = document.getElementById('current-url');
+            const audioContainer = document.getElementById('audio-container');
+            const statusMessage = document.getElementById('status-message');
+
+            // 支持的音频格式
+            const supportedFormats = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'];
+
+            // 获取当前页面URL
+            const currentUrl = window.location.href;
+            currentUrlElement.textContent = currentUrl;
+
+            // 检测并播放音频
+            detectAndPlayAudio(currentUrl);
+
+            function detectAndPlayAudio(urlString) {
+                try {
+                    const url = new URL(urlString);
+
+                    // 检查URL路径是否直接指向音频文件
+                    const pathExtension = getFileExtension(url.pathname);
+
+                    if (pathExtension && supportedFormats.includes(pathExtension.toLowerCase())) {
+                        // 直接播放当前URL
+                        playAudio(urlString, '检测到直接音频链接');
+                        return;
+                    }
+
+                    // 检查URL参数中是否包含音频链接
+                    let foundAudioUrl = null;
+
+                    // 检查查询参数
+                    url.searchParams.forEach((value, key) => {
+                        if (!foundAudioUrl) {
+                            try {
+                                const paramUrl = new URL(value);
+                                const paramExtension = getFileExtension(paramUrl.pathname);
+
+                                if (paramExtension && supportedFormats.includes(paramExtension.toLowerCase())) {
+                                    foundAudioUrl = value;
+                                }
+                            } catch (e) {
+                                // 参数值不是有效的URL，检查是否包含音频扩展名
+                                const extension = getFileExtension(value);
+                                if (extension && supportedFormats.includes(extension.toLowerCase())) {
+                                    foundAudioUrl = value;
+                                }
+                            }
+                        }
+                    });
+
+                    if (foundAudioUrl) {
+                        playAudio(foundAudioUrl, '检测到参数中的音频链接');
+                    } else {
+                        showError('未发现支持的音频文件');
+                    }
+
+                } catch (error) {
+                    console.error('URL解析错误:', error);
+                    showError('URL格式错误');
+                }
+            }
+
+            function getFileExtension(path) {
+                return path.split('.').pop().toLowerCase();
+            }
+
+            function playAudio(audioUrl, message) {
+                // 创建音频元素
+                const audioElement = document.createElement('audio');
+                audioElement.controls = true;
+                audioElement.style.width = '100%';
+
+                // 创建source元素
+                const sourceElement = document.createElement('source');
+                sourceElement.src = audioUrl;
+                sourceElement.type = getAudioType(audioUrl);
+
+                audioElement.appendChild(sourceElement);
+
+                // 清空容器并添加音频元素
+                audioContainer.innerHTML = '';
+                audioContainer.appendChild(audioElement);
+
+                // 显示成功消息
+                showSuccess(message);
+
+                // 尝试播放音频
+                audioElement.play().then(() => {
+                    // 播放成功，隐藏URL显示区域
+                    currentUrlElement.classList.add('hidden');
+                }).catch(error => {
+                    console.error('播放失败:', error);
+                    showError('音频加载失败，可能是格式不支持或跨域限制');
+                });
+
+                // 监听错误事件
+                audioElement.addEventListener('error', function () {
+                    showError('音频加载失败，格式可能不受支持');
+                });
+            }
+
+            function getAudioType(url) {
+                const extension = getFileExtension(url);
+                const typeMap = {
+                    'mp3': 'audio/mpeg',
+                    'wav': 'audio/wav',
+                    'ogg': 'audio/ogg',
+                    'flac': 'audio/flac',
+                    'aac': 'audio/aac',
+                    'm4a': 'audio/mp4'
+                };
+
+                return typeMap[extension] || 'audio/mpeg';
+            }
+
+            function showSuccess(message) {
+                statusMessage.textContent = message;
+                statusMessage.className = 'status success';
+            }
+
+            function showError(message) {
+                statusMessage.textContent = message;
+                statusMessage.className = 'status error';
+            }
+        });
+    </script>
+</body>
+
+</html>
